@@ -302,6 +302,44 @@ namespace LitJson
                 json = null;
             }
         }
+
+        public JsonData Opt(int index)
+        {
+            EnsureCollection();
+
+            if (type == JsonType.Array)
+            {
+                if(inst_array.Count < index && index >=0 )
+                    return inst_array[index];
+                else
+                    return null;
+            }
+
+            if (index >= 0 && index < object_list.Count)
+                return object_list[index].Value;
+            else
+                return null;
+        }
+
+        public JsonData Opt(string prop_name)
+        {
+            EnsureDictionary();
+            if (inst_object.ContainsKey(prop_name))
+                return inst_object[prop_name];
+            else
+                return null;
+        }
+
+        public JsonData OptPath(params string[] propNames)
+        {
+            JsonData target = this;
+            for(int i = 0; i < propNames.Length; i++)
+            {
+                target = target.Opt(propNames[i]);
+                if (target == null) break;
+            }
+            return target;
+        }
         #endregion
 
 
@@ -375,6 +413,16 @@ namespace LitJson
             type = JsonType.String;
             inst_string = str;
         }
+
+        public JsonData (int[] intArray)
+        {
+            IList instList = EnsureList();
+            if (intArray == null) return;
+            foreach (var value in intArray)
+            {
+                instList.Add(new JsonData(value));
+            }
+        }
         #endregion
 
 
@@ -439,7 +487,6 @@ namespace LitJson
             if (data.type != JsonType.Long)
                 throw new InvalidCastException (
                     "Instance of JsonData doesn't hold an int");
-
             return data.inst_long;
         }
 
