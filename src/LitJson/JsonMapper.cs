@@ -224,7 +224,7 @@ namespace LitJson
                 p_data.Info = p_info;
                 p_data.Type = p_info.PropertyType;
 
-                data.Properties.Add (p_info.Name, p_data);
+                data.Properties.Add(p_info.Name.ToLower(), p_data);
             }
 
             foreach (FieldInfo f_info in type.GetFields ()) {
@@ -233,7 +233,7 @@ namespace LitJson
                 p_data.IsField = true;
                 p_data.Type = f_info.FieldType;
 
-                data.Properties.Add (f_info.Name, p_data);
+                data.Properties.Add(f_info.Name.ToLower(), p_data);
             }
 
             lock (object_metadata_lock) {
@@ -358,7 +358,12 @@ namespace LitJson
 
                 // Maybe it's an enum
                 if (value_type.IsEnum)
-                    return Enum.ToObject (value_type, reader.Value);
+                {
+                    if (reader.Token == JsonToken.String)
+                        return Enum.Parse(value_type, (string)reader.Value, true);
+                    else
+                        return Enum.ToObject(value_type, reader.Value);
+                }
 
                 // Try using an implicit conversion operator
                 MethodInfo conv_op = GetConvOp (value_type, json_type);
@@ -425,11 +430,12 @@ namespace LitJson
                     if (reader.Token == JsonToken.ObjectEnd)
                         break;
 
-                    string property = (string) reader.Value;
+                    string property = (string)reader.Value;
+                    string propertyLowerCase = property.ToLower();
 
-                    if (t_data.Properties.ContainsKey (property)) {
+                    if (t_data.Properties.ContainsKey (propertyLowerCase)) {
                         PropertyMetadata prop_data =
-                            t_data.Properties[property];
+                            t_data.Properties[propertyLowerCase];
 
                         if (prop_data.IsField) {
                             ((FieldInfo) prop_data.Info).SetValue (
@@ -683,9 +689,7 @@ namespace LitJson
             table[json_type][value_type] = importer;
         }
 
-        private static void WriteValue (object obj, JsonWriter writer,
-                                        bool writer_is_private,
-                                        int depth)
+        private static void WriteValue(object obj, JsonWriter writer, int depth)
         {
             if (depth > max_nesting_depth)
                 throw new JsonException (
@@ -699,11 +703,7 @@ namespace LitJson
             }
 
             if (obj is IJsonWrapper) {
-                if (writer_is_private)
-                    writer.TextWriter.Write (((IJsonWrapper) obj).ToJson ());
-                else
-                    ((IJsonWrapper) obj).ToJson (writer);
-
+                ((IJsonWrapper)obj).ToJson(writer);
                 return;
             }
 
@@ -735,8 +735,8 @@ namespace LitJson
             if (obj is Array) {
                 writer.WriteArrayStart ();
 
-                foreach (object elem in (Array) obj)
-                    WriteValue (elem, writer, writer_is_private, depth + 1);
+                foreach (object elem in (Array)obj)
+                    WriteValue(elem, writer, depth + 1);
 
                 writer.WriteArrayEnd ();
 
@@ -746,7 +746,7 @@ namespace LitJson
             if (obj is IList) {
                 writer.WriteArrayStart ();
                 foreach (object elem in (IList) obj)
-                    WriteValue (elem, writer, writer_is_private, depth + 1);
+                    WriteValue(elem, writer, depth + 1);
                 writer.WriteArrayEnd ();
 
                 return;
@@ -756,7 +756,7 @@ namespace LitJson
                 writer.WriteObjectStart ();
                 foreach (DictionaryEntry entry in (IDictionary) obj) {
                     writer.WritePropertyName ((string) entry.Key);
-                    WriteValue (entry.Value, writer, writer_is_private,
+                    WriteValue(entry.Value, writer,
                                 depth + 1);
                 }
                 writer.WriteObjectEnd ();
@@ -806,7 +806,7 @@ namespace LitJson
                 if (p_data.IsField) {
                     writer.WritePropertyName (p_data.Info.Name);
                     WriteValue (((FieldInfo) p_data.Info).GetValue (obj),
-                                writer, writer_is_private, depth + 1);
+                                writer, depth + 1);
                 }
                 else {
                     PropertyInfo p_info = (PropertyInfo) p_data.Info;
@@ -814,7 +814,7 @@ namespace LitJson
                     if (p_info.CanRead) {
                         writer.WritePropertyName (p_data.Info.Name);
                         WriteValue (p_info.GetValue (obj, null),
-                                    writer, writer_is_private, depth + 1);
+                                    writer, depth + 1);
                     }
                 }
             }
@@ -828,7 +828,7 @@ namespace LitJson
             lock (static_writer_lock) {
                 static_writer.Reset ();
 
-                WriteValue (obj, static_writer, true, 0);
+                WriteValue(obj, static_writer, 0);
 
                 return static_writer.ToString ();
             }
@@ -836,7 +836,7 @@ namespace LitJson
 
         public static void ToJson (object obj, JsonWriter writer)
         {
-            WriteValue (obj, writer, false, 0);
+            WriteValue(obj, writer, 0);
         }
 
         public static JsonData ToObject (JsonReader reader)
@@ -862,6 +862,12 @@ namespace LitJson
         public static T ToObject<T> (JsonReader reader)
         {
             return (T) ReadValue (typeof (T), reader);
+        }
+
+        public static object ToObject(Type valueType, string json)
+        {
+            JsonReader reader = new JsonReader(json);
+            return ReadValue(valueType, reader);
         }
 
         public static T ToObject<T> (TextReader reader)
