@@ -6,6 +6,7 @@ Notation) strings.
 
 [Project website][litjson].
 
+该分支主要的修改:json字符串解析为对象的时候忽略大小写.
 
 ## Compiling
 
